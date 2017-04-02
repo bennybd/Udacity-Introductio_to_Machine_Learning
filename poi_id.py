@@ -3,6 +3,9 @@
 import sys
 import pickle
 import numpy as np
+import math
+import matplotlib.pyplot as plt
+
 sys.path.append("../tools/")
 
 from feature_format import featureFormat, targetFeatureSplit
@@ -14,11 +17,13 @@ print "Task 1"
 print "------"
 ### features_list is a list of strings, each of which is a feature name.
 ### The first feature must be "poi".
+#features_list = ['poi','salary'] # You will need to use more features
 features_list = ['poi','salary','to_messages','deferral_payments','total_payments','exercised_stock_options','bonus','restricted_stock','shared_receipt_with_poi','restricted_stock_deferred','total_stock_value','expenses','loan_advances','from_messages','other','from_this_person_to_poi','director_fees','deferred_income','long_term_incentive','from_poi_to_this_person'] # You will need to use more features
 
 ### Load the dictionary containing the dataset
 with open("final_project_dataset.pkl", "r") as data_file:
     data_dict = pickle.load(data_file)
+data_dict.pop("TOTAL", 0)
 data = featureFormat(data_dict, features_list)
 labels, features = targetFeatureSplit(data)
 
@@ -35,19 +40,53 @@ import csv
 from sklearn import preprocessing
 #features_scaled = preprocessing.MinMaxScaler().fit_transform(features)
 features_scaled = preprocessing.scale(features)
+data_range = range(0,len(labels))
+#with open('features_data.csv', 'wb') as csvfile:
+#    data_csv = csv.writer(csvfile, delimiter=',', quoting=csv.QUOTE_MINIMAL)
+#    row = []
+#    for feature in features_list:
+#        row += [feature]
+#            
+#    data_csv.writerow(row)
+#    for i in data_range:
+#        row = [labels[int(i)]]
+#        for feature in features_list[1:]:
+#            row += [features_scaled[int(i)][features_list.index(feature) - 1]]
+#        data_csv.writerow(row)
+#'''
+#    Instead of using Excel, implement visualization in Python!!!
+#'''
+from scipy.stats import moment
+#mu = moment(features_scaled)
+#sigma = moment(features_scaled, 2)
+#m3 = moment(features_scaled, 3)
+m4 = moment(features_scaled, 4)
 
-with open('features_data.csv', 'wb') as csvfile:
-    data_csv = csv.writer(csvfile, delimiter=',', quoting=csv.QUOTE_MINIMAL)
-    row = []
-    for feature in features_list:
-        row += [feature]
-            
-    data_csv.writerow(row)
-    for i in range(1,len(labels)):
-        row = [labels[int(i)]]
-        for feature in features_list[1:]:
-            row += [features_scaled[int(i)][features_list.index(feature) - 1]]
-        data_csv.writerow(row)
+labels_sorted = np.array(labels)
+features_sorted = np.array(features_scaled)
+indexes_sorted = np.array(data_range)
+
+for feature in features_list[:0:-1]:
+    feature_inds = labels_sorted.argsort()[::-1]
+    labels_sorted = labels_sorted[feature_inds]
+    features_sorted = features_sorted[feature_inds]
+    indexes_sorted = indexes_sorted[feature_inds]
+    
+labels_inds = labels_sorted.argsort()[::-1]
+labels_sorted = labels_sorted[labels_inds]
+features_sorted = features_sorted[labels_inds]
+indexes_sorted = indexes_sorted[labels_inds]
+
+
+c0 =  1 / math.sqrt(2)
+c = c0
+for feature in features_list[1:]:
+    clr = [c,(c + c0) % 1,(c + 2*c0) % 1]
+    c = (c + 3*c0) % 1
+    plt.plot(data_range, features_sorted[:,features_list.index(feature) - 1], color=clr)
+plt.plot(data_range, labels_sorted, color='k', linewidth=3)
+#plt.scatter(data_range, labels)
+plt.show()
 
 
 ### Task 2: Remove outliers
