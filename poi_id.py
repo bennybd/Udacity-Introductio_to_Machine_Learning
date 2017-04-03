@@ -10,6 +10,7 @@ sys.path.append("../tools/")
 
 from feature_format import featureFormat, targetFeatureSplit
 from tester import dump_classifier_and_data
+from mytools import scale
 
 ### Task 1: Select what features you'll use.
 print
@@ -17,78 +18,79 @@ print "Task 1"
 print "------"
 ### features_list is a list of strings, each of which is a feature name.
 ### The first feature must be "poi".
-#features_list = ['poi','salary'] # You will need to use more features
-features_list = ['poi','salary','to_messages','deferral_payments','total_payments','exercised_stock_options','bonus','restricted_stock','shared_receipt_with_poi','restricted_stock_deferred','total_stock_value','expenses','loan_advances','from_messages','other','from_this_person_to_poi','director_fees','deferred_income','long_term_incentive','from_poi_to_this_person'] # You will need to use more features
+'''
+    restricted_stock_deferred       Only 2 point of data at non-poi
+    loan_advances                   No data at all !!
+    deferral_payments               Very little un-interesting data
+    director_fees                   Very little un-interesting data
+'''
+features_list = ['poi','salary','to_messages','total_payments','exercised_stock_options','bonus','restricted_stock','shared_receipt_with_poi','total_stock_value','expenses','from_messages','other','from_this_person_to_poi','deferred_income','long_term_incentive','from_poi_to_this_person']
 
 ### Load the dictionary containing the dataset
 with open("final_project_dataset.pkl", "r") as data_file:
     data_dict = pickle.load(data_file)
 data_dict.pop("TOTAL", 0)
-data = featureFormat(data_dict, features_list)
-labels, features = targetFeatureSplit(data)
+data_dict.pop("LAY KENNETH L", 0)
 
-import csv
-#with open('enron_data.csv', 'wb') as csvfile:
-#    data_csv = csv.writer(csvfile, delimiter=',', quoting=csv.QUOTE_MINIMAL)
-#    row = ["name"]
-#    for potential_feature in data_dict['ALLEN PHILLIP K']:
-#        row += ['\'' + potential_feature + '\'']
-#    data_csv.writerow(row)
-#    for name in data_dict:
-#        row = [value for key, value in data_dict[name].items()]
-#        data_csv.writerow([name] + row)
-from sklearn import preprocessing
-#features_scaled = preprocessing.MinMaxScaler().fit_transform(features)
-features_scaled = preprocessing.scale(features)
-data_range = range(0,len(labels))
-#with open('features_data.csv', 'wb') as csvfile:
-#    data_csv = csv.writer(csvfile, delimiter=',', quoting=csv.QUOTE_MINIMAL)
-#    row = []
-#    for feature in features_list:
-#        row += [feature]
-#            
-#    data_csv.writerow(row)
-#    for i in data_range:
-#        row = [labels[int(i)]]
-#        for feature in features_list[1:]:
-#            row += [features_scaled[int(i)][features_list.index(feature) - 1]]
-#        data_csv.writerow(row)
-#'''
-#    Instead of using Excel, implement visualization in Python!!!
-#'''
-from scipy.stats import moment
-#mu = moment(features_scaled)
-#sigma = moment(features_scaled, 2)
-#m3 = moment(features_scaled, 3)
-m4 = moment(features_scaled, 4)
+#data = featureFormat(data_dict, features_list)
+#labels, features = targetFeatureSplit(data)
+data = featureFormat(data_dict, features_list, remove_NaN=False)
+names = data[1]
+labels, features = targetFeatureSplit(data)
+data_range = range(len(labels))
+
+#from sklearn import preprocessing
+##features_scaled = preprocessing.MinMaxScaler().fit_transform(features)
+#features_scaled = preprocessing.scale(features)
+features_scaled = scale(features)
 
 labels_sorted = np.array(labels)
-features_sorted = np.array(features_scaled)
+features_sorted = features_scaled
 indexes_sorted = np.array(data_range)
 
-for feature in features_list[:0:-1]:
-    feature_inds = labels_sorted.argsort()[::-1]
-    labels_sorted = labels_sorted[feature_inds]
-    features_sorted = features_sorted[feature_inds]
-    indexes_sorted = indexes_sorted[feature_inds]
-    
+for feature in features_list[:0:-1]:   
+    feature_index = features_list[1:].index(feature)
+    feature_data = features_sorted[:,feature_index]
+    for person_index, feature_value in enumerate(feature_data):
+        if math.isnan(feature_value):
+            features_sorted[person_index][feature_index] = 0
+
 labels_inds = labels_sorted.argsort()[::-1]
 labels_sorted = labels_sorted[labels_inds]
 features_sorted = features_sorted[labels_inds]
 indexes_sorted = indexes_sorted[labels_inds]
 
-
 c0 =  1 / math.sqrt(2)
 c = c0
+print '{0:28s} {1:10s}  {2:10s}  {3:6s}   {4:30s}'.format('feature', 'value', 'unscaled', 'index', 'name')
+print '{0:28s} {1:10s}  {2:10s}  {3:6s}   {4:30s}'.format('---------', '-------', '---------', '------', '-------')
 for feature in features_list[1:]:
     clr = [c,(c + c0) % 1,(c + 2*c0) % 1]
-    c = (c + 3*c0) % 1
-    plt.plot(data_range, features_sorted[:,features_list.index(feature) - 1], color=clr)
-plt.plot(data_range, labels_sorted, color='k', linewidth=3)
-#plt.scatter(data_range, labels)
+    c = (c + 5*c0) % 1
+    feature_data = features_sorted[:,features_list[1:].index(feature)]
+    
+    for person_index, feature_value in enumerate(feature_data):
+#        person_indexName = data_dict.keys()[np.where(indexes_sorted==person_index)[0]]
+        person_indexName = names[indexes_sorted[person_index]]
+        if (feature_value > 7) or (feature_value < -7):
+            feature_unscaled = int(np.array(features)[:,features_list[1:].index(feature)][indexes_sorted[person_index]])
+            print '{0:28s} {1:10f}  {2:10d}  {3:6d}   {4:30s}'.format(feature, feature_value, feature_unscaled, person_index, person_indexName)
+#            print '{0:28s} {1:10f}  {2:6d}   {3:30s}'.format(feature, feature_value, person_index, person_indexName)
+
+    plt.plot(data_range, feature_data, color=clr)
+plt.plot(data_range, scale(labels_sorted), color='k', linewidth=3)
 plt.show()
 
-
+#for feature in features_list[1:]:
+#    clr = [c,(c + c0) % 1,(c + 2*c0) % 1]
+#    c = (c + 5*c0) % 1
+#    feature_data = features_sorted[:,features_list[1:].index(feature)]
+#    
+#    plt.plot(data_range, feature_data, color=clr)
+#    plt.plot(data_range, scale(labels_sorted), color='k', linewidth=3)
+#    plt.title(feature)
+#    plt.show()
+    
 ### Task 2: Remove outliers
 print
 print "Task 2"
@@ -101,8 +103,28 @@ print "------"
 my_dataset = data_dict
 
 ### Extract features and labels from dataset for local testing
-data = featureFormat(my_dataset, features_list, sort_keys = True)
+data = featureFormat(my_dataset, features_list, sort_keys = True, remove_NaN=False)
 labels, features = targetFeatureSplit(data)
+features_scaled = scale(features)
+
+for feature in features_list[:0:-1]:   
+    feature_index = features_list[1:].index(feature)
+    feature_data = features_scaled[:,feature_index]
+    for person_index, feature_value in enumerate(feature_data):
+        if math.isnan(feature_value):
+            features_scaled[person_index][feature_index] = 0
+
+'''
+        NEW FEATURES !
+        use the words in the content of the emails.
+        find words that are good indicator for poi and define it as a feature.
+        this can ce done buy text inspection.
+        or we can just use all the words and create a bag of words
+        like in the sara and mashmo exersize.
+        then do a massive dimention reduction by vectorising and pca.
+
+'''
+
 
 ### Task 4: Try a varity of classifiers
 ### Please name your classifier clf for easy export below.
@@ -116,6 +138,12 @@ print "------"
 # Provided to give you a starting point. Try a variety of classifiers.
 from sklearn.naive_bayes import GaussianNB
 clf = GaussianNB()
+
+
+
+
+print            
+sys.exit(0)
 
 ### Task 5: Tune your classifier to achieve better than .3 precision and recall 
 ### using our testing script. Check the tester.py script in the final project
